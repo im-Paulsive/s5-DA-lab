@@ -51,15 +51,31 @@ def print_tree(tree, indent=""):
             print(f"{indent}[{feature} = {val}]")
             print_tree(subtree, indent + "  ")
 
-def predict(tree, sample, features):
+def predict(tree, sample):
+    # If we reached a leaf node (string or number)
     if not isinstance(tree, dict):
-        return tree  # Leaf node
+        return tree
+
+    # Get current feature to check
     feature = next(iter(tree))
-    feature_index = features.index(feature)
-    value = sample[feature_index]
-    if value not in tree[feature]:
-        return "Unknown"
-    return predict(tree[feature][value], sample, features)
+    feature_value = sample.get(feature)
+
+    # Move down the correct branch
+    if feature_value in tree[feature]:
+        # Recursively predict within this branch
+        return predict(tree[feature][feature_value], sample)
+    else:
+        # If we don’t find a matching branch, 
+        # but the current node is already a leaf (like 'Yes' or 'No'),
+        # return that leaf value instead of 'Unknown'.
+        sub_tree = tree[feature]
+        # If *all* branches under this feature lead to the same label,
+        # we can safely return that label.
+        if all(not isinstance(v, dict) and v == list(sub_tree.values())[0] for v in sub_tree.values()):
+            return list(sub_tree.values())[0]
+        else:
+            return "Unknown"
+
 
 
 overall_entropy = entropy(df[target_column])
@@ -79,13 +95,18 @@ print("Decision Tree (Text Format):")
 print_tree(decision_tree)
 
 
-sample = []
+# --- Take user input as a dictionary ---
+sample = {}
 for f in features:
-    val = input(f"Enter {f}: ").strip().lower()
-    sample.append(val)
+    val = input(f"Enter " + f + ": ").strip().capitalize()
+    sample[f] = val
 
-prediction = predict(decision_tree, sample, features)
+# --- Predict the class ---
+prediction = predict(decision_tree, sample)
 print("\nPredicted class:", prediction)
+
+
+
 #X = pd.get_dummies(df[features])
 #y = df[target_column]
 
