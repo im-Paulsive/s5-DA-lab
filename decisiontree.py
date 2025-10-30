@@ -51,6 +51,17 @@ def print_tree(tree, indent=""):
             print(f"{indent}[{feature} = {val}]")
             print_tree(subtree, indent + "  ")
 
+def predict(tree, sample, features):
+    if not isinstance(tree, dict):
+        return tree  # Leaf node
+    feature = next(iter(tree))
+    feature_index = features.index(feature)
+    value = sample[feature_index]
+    if value not in tree[feature]:
+        return "Unknown"
+    return predict(tree[feature][value], sample, features)
+
+
 overall_entropy = entropy(df[target_column])
 print(f"Total Entropy of dataset (INFO(D)): {overall_entropy:.4f}\n")
 
@@ -67,6 +78,14 @@ decision_tree = build_tree(df, features, target_column)
 print("Decision Tree (Text Format):")
 print_tree(decision_tree)
 
+
+sample = []
+for f in features:
+    val = input(f"Enter {f}: ").strip().lower()
+    sample.append(val)
+
+prediction = predict(decision_tree, sample, features)
+print("\nPredicted class:", prediction)
 #X = pd.get_dummies(df[features])
 #y = df[target_column]
 
