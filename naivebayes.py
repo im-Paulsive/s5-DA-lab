@@ -1,63 +1,53 @@
-import numpy as np
+import pandas as pd
+from collections import defaultdict
 
-# --- Sample Dataset ---
-# Columns: [feature1, feature2], last column is label
-data = np.array([
-    ['sunny', 'hot', 'no'],
-    ['sunny', 'hot', 'no'],
-    ['overcast', 'hot', 'yes'],
-    ['rainy', 'mild', 'yes'],
-    ['rainy', 'cool', 'yes'],
-    ['rainy', 'cool', 'no'],
-    ['overcast', 'cool', 'yes'],
-    ['sunny', 'mild', 'no'],
-    ['sunny', 'cool', 'yes'],
-    ['rainy', 'mild', 'yes']
-])
+# --- Step 1: Dataset ---
+data = {
+    'Outlook': ['Sunny','Sunny','Overcast','Rain','Rain','Rain','Overcast','Sunny','Sunny','Rain','Sunny','Overcast','Overcast','Rain'],
+    'Temperature': ['Hot','Hot','Hot','Mild','Cool','Cool','Cool','Mild','Cool','Mild','Mild','Mild','Hot','Mild'],
+    'Humidity': ['High','High','High','High','Normal','Normal','Normal','High','Normal','Normal','Normal','High','Normal','High'],
+    'Wind': ['Weak','Strong','Weak','Weak','Weak','Strong','Strong','Weak','Weak','Weak','Strong','Strong','Weak','Strong'],
+    'PlayTennis': ['No','No','Yes','Yes','Yes','No','Yes','No','Yes','Yes','Yes','Yes','Yes','No']
+}
+df = pd.DataFrame(data)
 
-# --- Step 1: Train Naive Bayes ---
-def train_naive_bayes(data):
-    X = data[:, :-1]
-    y = data[:, -1]
-    classes = np.unique(y)
-    class_probs = {}
-    feature_probs = {}
-    
+# --- Step 2: Train Naive Bayes ---
+def train_naive_bayes(df, target):
+    model = defaultdict(lambda: defaultdict(dict))
+    classes = df[target].unique()
     for c in classes:
-        X_c = X[y == c]
-        class_probs[c] = len(X_c) / len(y)
-        feature_probs[c] = []
-        for col in range(X.shape[1]):
-            values, counts = np.unique(X_c[:, col], return_counts=True)
-            probs = {val: count/len(X_c) for val, count in zip(values, counts)}
-            feature_probs[c].append(probs)
-    return class_probs, feature_probs, classes
+        subset = df[df[target] == c]
+        model['priors'][c] = len(subset) / len(df)
+        for feature in df.columns.drop(target):
+            for v in df[feature].unique():
+                model[feature][v][c] = len(subset[subset[feature] == v]) / len(subset)
+    return model
 
-# --- Step 2: Predict ---
-def predict_naive_bayes(X_test, class_probs, feature_probs, classes):
-    predictions = []
-    for x in X_test:
-        class_scores = {}
-        for c in classes:
-            score = np.log(class_probs[c])  # use log to prevent underflow
-            for i, val in enumerate(x):
-                score += np.log(feature_probs[c][i].get(val, 1e-6))  # handle unseen values
-            class_scores[c] = score
-        predictions.append(max(class_scores, key=class_scores.get))
-    return predictions
+# --- Step 3: Predict and display intermediate steps ---
+def predict(model, sample):
+    classes = model['priors'].keys()
+    probs = {}
+    print("\n=== Probability Computation Steps ===")
+    for c in classes:
+        prob = model['priors'][c]
+        print(f"\nClass = {c}, Prior = {prob:.3f}")
+        for feature, value in sample.items():
+            cond_prob = model[feature].get(value, {}).get(c, 0)
+            print(f"P({feature}={value} | {c}) = {cond_prob:.3f}")
+            prob *= cond_prob
+        probs[c] = prob
+        print(f"→ Combined likelihood for class '{c}' = {prob:.6f}")
+    return max(probs, key=probs.get), probs
 
-# --- Step 3: Test the classifier ---
-class_probs, feature_probs, classes = train_naive_bayes(data)
+# --- Step 4: Build model & Predict ---
+model = train_naive_bayes(df, 'PlayTennis')
 
-# Test data
-X_test = np.array([
-    ['sunny', 'cool'],
-    ['rainy', 'hot'],
-    ['overcast', 'mild']
-])
+sample = {}
+for f in df.columns[:-1]:
+    sample[f] = input(f"Enter {f}: ").strip().capitalize()
 
-predictions = predict_naive_bayes(X_test, class_probs, feature_probs, classes)
+pred, probs = predict(model, sample)
 
-# --- Step 4: Print Results ---
-for x, p in zip(X_test, predictions):
-    print("Input:", x, "-> Predicted class:", p)
+print("\n=== Final Results ===")
+print("Posterior Probabilities:", probs)
+print("Predicted Class:", pred)
